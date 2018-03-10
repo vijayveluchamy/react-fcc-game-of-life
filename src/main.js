@@ -27,8 +27,28 @@ const getRandomState = (rowCount, colCount) => {
     return state;
 };
 
+/**
+ * Function to clear the board 
+ */
+const getClearedState = (rowCount, colCount) => {
+    let state = [];
+
+    for (let i = 0; i < rowCount; i++) {
+        let currentRow = [];
+        for (let j = 0; j < colCount; j++) {
+            currentRow.push('dead');
+        }
+        state.push(currentRow);
+    }
+    return state;
+}
+
+//Predicate to find alive cells
 const isAlive = (state) => state === 'alive' || state === 'old';
 
+/**
+ * Function to get the states all the neighbours
+ */
 const getNeighbourStates = (state, x , y) => {
     const rows = state.length;
     const cols = state[0].length;
@@ -49,6 +69,9 @@ const getNeighbourStates = (state, x , y) => {
 
 };
 
+/**
+ * Function to find the next state of the given cell
+ */
 const getNextCellState = (state, x , y) => {
     let currState = state[x][y];
     let neighbourStates = getNeighbourStates(state, x, y);
@@ -78,6 +101,9 @@ const getNextCellState = (state, x , y) => {
     return nextState;
 };
 
+/**
+ * Function to find the next state of the whole board
+ */
 const getNextBoardState = (state) => {
     return state.map((row, rowIdx) => {
         return row.map((currCell, colIdx) => {
@@ -86,6 +112,17 @@ const getNextBoardState = (state) => {
     });
 };
 
+const findAliveCellCount = (state) => {
+    let rowWiseCount = state.map((row, rowIdx) => {
+        return row.filter(isAlive).length;
+    });
+    return rowWiseCount.reduce((sum, val) => {
+        return sum + val;
+    }, 0);
+}
+/*
+* Component represents each cell
+*/
 class Cell extends Component {
     render() {
         const classes = 'cell '+this.props.status;
@@ -99,8 +136,64 @@ class Cell extends Component {
             </div>
         );
     }
-
 }
+
+class AppTitle extends Component {
+
+    render() {
+        return (
+            <div id="title-container">
+                    <header>Game of Life App</header>
+            </div>
+        );
+    }
+}
+
+class TopButtonControl extends Component {
+
+    constructor(props) {
+        super(props);
+    }
+
+    render() {
+        return (
+            <div id='top-btn-container'>
+                <button 
+                    onClick={this.props.onPlayClick}
+                    disabled={this.props.active}
+                >
+                    Play
+                </button>
+                <button 
+                    onClick={this.props.onPauseClick}
+                    disabled={!this.props.active}
+                >
+                    Pause
+                </button>
+                <button 
+                    onClick={this.props.onClearClick}
+                    disabled={this.props.cleared}
+                >
+                    Clear
+                </button>
+            </div>
+        );
+    }
+}
+
+class GenerationLabel extends Component {
+    render() {
+        return (
+            <div id='gen-lbl-container'>
+                <label>
+                    <b>Generations: </b> 
+                    {this.props.generations}
+                </label>
+            </div>
+        );
+    }
+}
+
 class GameOfLifeBoard extends Component {
 
     constructor() {
@@ -108,7 +201,8 @@ class GameOfLifeBoard extends Component {
         this.windowSize = WINDOW_SIZE.SMALL;
         this.state = {
             active: true,
-            intervalId: null
+            intervalId: null,
+            generations: 0
         }
     }
 
@@ -144,9 +238,16 @@ class GameOfLifeBoard extends Component {
 
     play() {
         let intervalId = window.setInterval(()=>{
-            this.setState({
-                board: getNextBoardState(this.state.board)
-            });
+            let nextBoardState = getNextBoardState(this.state.board);
+            if ( findAliveCellCount(nextBoardState) === 0) {
+                this.clear();
+            } else {
+                this.setState({
+                    board: nextBoardState,
+                    cleared: false,
+                    generations: this.state.generations + 1
+                });
+            }
         },250);
             
         this.setState({
@@ -165,39 +266,70 @@ class GameOfLifeBoard extends Component {
         }    
     }
 
+    clear() {
+        if (this.state.intervalId) {
+            window.clearInterval(this.state.intervalId);
+        }
+        this.setState({
+            intervalId: null,
+            active: false,
+            cleared: true,
+            generations: 0,
+            board: getClearedState(this.windowSize.rows, this.windowSize.cols)
+        });
+    }
+
     render() {
         return (
             <div id="board-container">
-            {
-                this.state.board.map((row, rowIndex) => {
-                    return row.map((cellStatus, colIndex) => {
-                        const classes = 'cell '+cellStatus;
-                        return (
-                            <Cell
-                                key={rowIndex+'|'+colIndex} 
-                                row={rowIndex} 
-                                col={colIndex} 
-                                status={cellStatus}
-                                onCellClick={ e => this.onCellClick(e)}
-                            >
-                            </Cell>
-                        )
-                    });
-                })
-            }
+                <TopButtonControl
+                    onPlayClick={() => this.play()}
+                    onPauseClick={() => this.pause()}
+                    onClearClick={() => this.clear()}
+                    active={this.state.active}
+                    cleared={this.state.cleared}
+                />
+                <GenerationLabel
+                    generations={this.state.generations}
+                />
+                <div id="board">
+                {
+                    this.state.board.map((row, rowIndex) => {
+                        return row.map((cellStatus, colIndex) => {
+                            const classes = 'cell '+cellStatus;
+                            return (
+                                <Cell
+                                    key={rowIndex+'|'+colIndex} 
+                                    row={rowIndex} 
+                                    col={colIndex} 
+                                    status={cellStatus}
+                                    onCellClick={ e => this.onCellClick(e)}
+                                >
+                                </Cell>
+                            )
+                        });
+                    })
+                }
+                </div>
             </div>
         );
     }
 }
 
+class App extends Component {
+    render() {
+        return (
+            <div id="main-container">
+                <AppTitle/>
+                <GameOfLifeBoard/>
+            </div> 
+        )
+    }
+}
+
 const render = () => {
     ReactDOM.render(
-        <div id="main-container">
-            <div id="title-container">
-                <header>Game of Life App</header>
-            </div>
-            <GameOfLifeBoard/>
-        </div>    
+        <App/>   
         ,
         document.getElementById('root')
     )
